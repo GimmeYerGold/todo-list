@@ -6,6 +6,33 @@ import polyfill from "babel-polyfill"
 // if you uncomment 'universal-utils' below, you can comment out this line
 import fetch from "isomorphic-fetch"
 
+// universal utils: cache, fetch, store, resource, fetcher, router, vdom, etc
+// import * as u from 'universal-utils'
+
+// the following line, if uncommented, will enable browserify to push
+// a changed fn to you, with source maps (reverse map from compiled
+// code line # to source code line #), in realtime via websockets
+// -- browserify-hmr having install issues right now
+// if (module.hot) {
+//     module.hot.accept()
+//     module.hot.dispose(() => {
+//         app()
+//     })
+// }
+
+// Check for ServiceWorker support before trying to install it
+// if ('serviceWorker' in navigator) {
+//     navigator.serviceWorker.register('./serviceworker.js').then(() => {
+//         // Registration was successful
+//         console.info('registration success')
+//     }).catch(() => {
+//         console.error('registration failed')
+//             // Registration failed
+//     })
+// } else {
+//     // No ServiceWorker Support
+// }
+
 import $ from "jquery"
 import _ from "underscore"
 import Backbone from "bbfire"
@@ -21,9 +48,7 @@ function app() {
     var ItemModel = Backbone.Model.extend({
 
     	defaults: {
-    		done: false,
-            dueDate: "",
-            descript: ""
+    		done: false
     	},
 
     	initialize: function(taskName) {
@@ -31,16 +56,32 @@ function app() {
     	}
     })
 
-    var ToDoCollection = Backbone.Collection.extend({
+    var ToDoCollection = Backbone.Firebase.Collection.extend({
     	model: ItemModel
+    	url: "https://giterdone.firebaseio.com/users/jason/tasks"
     })
 
-    var ToDoView = React.createClass({
+    var LoginView = React.createClass ({
+    	render: function() {
+    		return (
+    			<div className="loginContainer">
+    				<input onKeyDown={this._submitUsername} name="username"/>
+    				</div>
+    				)
+    	},
+    	_submitUsername: function(e) {
+    		if (e.keyCode === 13) {
+    			var username = e.target.value
+    		}
+    	}
+    })
 
-    	_addItem: function(taskName) {
-            // var mod = new ItemModel({task: taskName}) 
+    var TodoView = React.createClass({
+
+    	_addItem: function(task) {
     		
-    		this.state.all.add(new ItemModel(taskName))
+
+    		this.state.todoColl.add({})
     		this._updater()
     	},
 
@@ -53,13 +94,18 @@ function app() {
     		})
     	},
 
+    	componentWillMount: function() {
+    		var self = this
+    		this.props.todoColl.on()
+    	}
+
     	getInitialState: function() {
     		return {
-    			all: this.props.toDoColl,
-    			done: this.props.toDoColl.where({
+    			all: this.props.todoColl,
+    			done: this.props.todoColl.where({
     				done: true}),
-    			undone: this.props.toDoColl.where({done: false}),
-    			showing: this.props.showing
+    			undone: this.props.todoColl.where({done: false}),
+    			showling: this.props.showing
     		}
     	},
 
@@ -69,14 +115,14 @@ function app() {
     		if (this.state.showing === "undone") coll = this.state.undone
     		
     		return (
-    			<div className="toDoView">
-	    			<Tabs updater={this._updater}
+    			<div className="todoView">
+	    			<Tabs updater={this._update}
 	    				showing={this.state.showing} />
 	    			<ItemAdder adderFunc={this._addItem}/>
-	    			<ToDoList updater={this._updater}
-	    				toDoColl={coll}/>
+	    			<TodoList updater={this._update}
+	    				todoColl={coll}/>
     			</div>		
-    		)	
+    			)	
     	}		
     })
 
@@ -91,7 +137,7 @@ function app() {
     			<div className="tabs">
     			{["all", "done", "undone"].map(this._genTab)}
     			</div>
-    		)
+    			)
     	}	
     })
 
@@ -104,7 +150,7 @@ function app() {
     	render: function() {
     		var styleObj = {}
     		if (this.props.type === this.props.showing){
-    				styleObj.background = "orange"
+    				styleObj.borderBottom = "#ddd"
     		}
 
     		return (
@@ -119,19 +165,19 @@ function app() {
     var ItemAdder = React.createClass({
 
     	_handleKeyDown: function(keyEvent) {
-            if(keyEvent.keyCode === 13) {
-                var newToDoItem = keyEvent.target.value
-                this.props.adderFunc(newToDoItem)
-                keyEvent.target.value = ""
-            }   
+    		if(keyEvent.keycode === 13) {
+    			var guestName = keyEvent.target.value
+    			this.props.adderFunc(guestName)
+    			keyEvent.target.value = ""
+    		}
     	},
 
     	render: function() {
-    		return <input onKeyDown={this._handleKeyDown} className="toDoAdder" type="text" placeholder="whatca gotta do?" id="toDo"/>
+    		return <input onKeyDown={this._handleKeyDown} />
     	}
     })
     
-    var ToDoList = React.createClass({
+    var TodoList = React.createClass({
 
     	_makeItem: function(model,i) {
     		console.log(model, i)
@@ -140,10 +186,10 @@ function app() {
     	
     	render: function() {
     		return (
-    			<div className="toDoList">
-    				{this.props.toDoColl.map(this._makeItem)}
+    			<div className="todoList">
+    				{this.props.todoColl.mpa(this._makeItem)}
     			</div>	
-    		)
+    			)
     	}	
     })
 
@@ -154,41 +200,21 @@ function app() {
     		}
     		else {
     			this.props.itemModel.set({done: true}
-    			)
+    				)
     		}	
     		this.props.updater()
     	},
-
-        _handleDescription: function(keyEvent) {
-            if(keyEvent.keyCode === 13) {
-                var newDesc = keyEvent.target.value
-                this.props.itemModel.set({descript: newDesc})
-                console.log(this.props.itemModel)
-                keyEvent.target.value = ""
-            }   
-        },
-
-        _handleDueDate: function(keyEvent) {
-            if(keyEvent.keyCode === 13) {
-                var newDueDate = keyEvent.target.value
-                this.props.itemModel.set({dueDate: newDueDate})
-                console.log(this.props.itemModel)
-                keyEvent.target.value = ""
-            }   
-        },
 
     	render: function() {
     		var buttonFiller = this.props.itemModel.
     		get('done') ? "\u2713" : ' '
 
     		return (
-    			<div className="toDoItem">
-    				{this.props.itemModel.get('task')}
-                    <input onKeyDown={this._handleDescription} className="descAdder" type="text" placeholder="description..." id="desc"/>
-                    <input onKeyDown={this._handleDueDate} className="dueDateAdder" type="text" placeholder="Due when?" id="dueDate"/>
+    			<div className="todoItem">
+    				<p>{this.props.itemModel.get('task')}</p>
     			<button onClick={this._toggleDone}>{buttonFiller}</button>
     			</div>	
-    		)
+    			)
     	}
     })
 
@@ -196,19 +222,22 @@ function app() {
     	routes: {
     		"undone": "showUndone",
     		"done" : "showDone",
-    		"*default" : "home"
+    		"*default" : "showAll"
     	},
 
     	showDone: function(){
-    	DOM.render(<ToDoView showing="done" toDoColl={new ToDoCollection()}/>, document.querySelector('.container'))	
+    	DOM.render(<TodoView showing="done" todoColl={new TodoCollection()}/>, document.querySelector('.container'))	
     	},
 
-    	home: function(){
-    	DOM.render(<ToDoView showing="all" toDoColl={new ToDoCollection()}/>, document.querySelector('.container'))
+    	showAll: function(){
+    	var tc = new TodoCollection()
+    	var boundFetcher = tc.fetch.bind
+    	var intervalID = setInterval(tc.fetch.bind())	
+    	DOM.render(<TodoView showing="all" todoColl={new TodoCollection()}/>, document.querySelector('.container'))
     	},
 
-    	showUnDone: function(){
-    	DOM.render(<ToDoView showing="undone" toDoColl={new ToDoCollection()}/>, document.querySelector('.container'))
+    	showDone: function(){
+    	DOM.render(<TodoView showing="undone" todoColl={new TodoCollection()}/>, document.querySelector('.container'))
     	},
 
     	initialize: function() {
@@ -216,7 +245,7 @@ function app() {
     	}
     })
 
-    var pr = new ToDoRouter()
+    var pr = new TodoRouter()
     
 }
 

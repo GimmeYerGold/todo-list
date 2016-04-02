@@ -127,3 +127,30 @@ body {
 /**
  * App code
  */
+
+.toDoView {
+    text-align: center;
+
+    .tab {
+        border: 5px tomato solid;
+        display: inline-block;
+        margin: 5%;   
+        width: 10%; 
+    }
+
+    .toDoAdder {
+        margin: 2%;
+    }
+
+    span {
+        margin: 2%;
+    }
+
+    .descAdder {
+        margin: 2%;
+    }
+
+    .dueDateAdder {
+        margin: 2%;
+    }
+}
